@@ -9,8 +9,8 @@ public class CustomersController : ControllerBase
 {
     private static List<Customer> customers = new List<Customer>
     {
-        new Customer { Id = 1, Name = "Anas", Phone = "0790000000" },
-        new Customer { Id = 2, Name = "Ahmad", Phone = "0780000000" }
+        new Customer { Id = 1, Name = "Anas", Phone = "0786785881" },
+        new Customer { Id = 2, Name = "Ahmad", Phone = "0782574633" }
     };
     private static int nextCustomerId = 3;
 
@@ -18,6 +18,21 @@ public class CustomersController : ControllerBase
     public IActionResult GetAllCustomers()
     {
         return Ok(customers);
+    }
+
+    [HttpGet("search")]
+    public IActionResult SearchCustomers([FromQuery] string name)
+    {
+        List<Customer> results = customers
+            .Where(customer => customer.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (!results.Any())
+        {
+            return NotFound("No customers found");
+        }
+
+        return Ok(results);
     }
 
     [HttpGet("{id}")]
@@ -79,5 +94,6 @@ public class CustomersController : ControllerBase
 
         return NoContent();
     }
+
 
 }
