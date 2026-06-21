@@ -1,99 +1,105 @@
-﻿using CustomerApii.Models;
+﻿using CustomerApii.Data;
+using CustomerApii.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace CustomerApii.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
+[ApiController]
 public class CustomersController : ControllerBase
 {
-    private static List<Customer> customers = new List<Customer>
+    private readonly AppDbContext _context;
+
+    public CustomersController(AppDbContext context)
     {
-        new Customer { Id = 1, Name = "Anas", Phone = "0786785881" },
-        new Customer { Id = 2, Name = "Ahmad", Phone = "0782574633" }
-    };
-    private static int nextCustomerId = 3;
+        _context = context;
+    }
 
     [HttpGet]
-    public IActionResult GetAllCustomers()
+    public async Task<ActionResult<List<Customer>>> GetCustomers()
     {
+        var customers = await _context.Customers.ToListAsync();
+
         return Ok(customers);
     }
 
-    [HttpGet("search")]
-    public IActionResult SearchCustomers([FromQuery] string name)
-    {
-        List<Customer> results = customers
-            .Where(customer => customer.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (!results.Any())
-        {
-            return NotFound("No customers found");
-        }
-
-        return Ok(results);
-    }
-
     [HttpGet("{id}")]
-    public IActionResult GetCustomerById(int id)
+    public async Task<ActionResult<Customer>> GetCustomerById([FromRoute] int id)
     {
-        Customer? customer = customers.FirstOrDefault(customer => customer.Id == id);
+        var customer = await _context.Customers.FindAsync(id);
 
         if (customer == null)
         {
-            return NotFound("Customer not found");
+            return NotFound();
         }
 
         return Ok(customer);
     }
 
     [HttpPost]
-    public IActionResult AddCustomer([FromBody] CustomerRequest request)
+    public async Task<ActionResult<Customer>> CreateCustomer([FromBody] CustomerRequest request)
     {
-        Customer customer = new Customer
+        var customer = new Customer
         {
-            Id = nextCustomerId,
             Name = request.Name,
             Phone = request.Phone
         };
 
-        customers.Add(customer);
-        nextCustomerId++;
+        _context.Customers.Add(customer);
+        await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetCustomerById), new { id = customer.Id }, customer);
     }
 
     [HttpPut("{id}")]
-    public IActionResult UpdateCustomer([FromRoute] int id, [FromBody] CustomerRequest request)
+    public async Task<ActionResult<Customer>> UpdateCustomer(
+        [FromRoute] int id,
+        [FromBody] CustomerRequest request)
     {
-        Customer? customerToUpdate = customers.FirstOrDefault(customer => customer.Id == id);
+        var customer = await _context.Customers.FindAsync(id);
 
-        if (customerToUpdate == null)
+        if (customer == null)
         {
-            return NotFound("Customer not found");
+            return NotFound();
         }
 
-        customerToUpdate.Name = request.Name;
-        customerToUpdate.Phone = request.Phone;
+        customer.Name = request.Name;
+        customer.Phone = request.Phone;
 
-        return NoContent();
+        await _context.SaveChangesAsync();
+
+        return Ok(customer);
     }
 
     [HttpDelete("{id}")]
-    public IActionResult DeleteCustomer([FromRoute] int id)
+    public async Task<IActionResult> DeleteCustomer([FromRoute] int id)
     {
-        Customer? customerToDelete = customers.FirstOrDefault(customer => customer.Id == id);
+        var customer = await _context.Customers.FindAsync(id);
 
-        if (customerToDelete == null)
+        if (customer == null)
         {
-            return NotFound("Customer not found");
+            return NotFound();
         }
 
-        customers.Remove(customerToDelete);
+        _context.Customers.Remove(customer);
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }
 
+    [HttpGet("search")]
+    public async Task<ActionResult<List<Customer>>> SearchCustomers([FromQuery] string? name)
+    {
+        var query = _context.Customers.AsQueryable();
 
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            query = query.Where(customer => customer.Name.Contains(name));
+        }
+
+        var customers = await query.ToListAsync();
+
+        return Ok(customers);
+    }
 }
